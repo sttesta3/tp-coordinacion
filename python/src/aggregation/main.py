@@ -23,21 +23,22 @@ class AggregationFilter:
         self.output_queue = middleware.MessageMiddlewareQueueRabbitMQ(
             MOM_HOST, OUTPUT_QUEUE
         )
-        self.fruit_top = []
+        self.client_fruit_top = {}  
 
-    def _process_data(self, fruit, amount):
-        logging.info("Processing data message")
-        for i in range(len(self.fruit_top)):
-            if self.fruit_top[i].fruit == fruit:
-                self.fruit_top[i] = self.fruit_top[i] + fruit_item.FruitItem(
+    def _process_data(self, client, fruit, amount):
+        logging.info(f"Processing data message {client} {fruit} {amount}")
+        self.client_fruit_top[client] = self.client_fruit_top.get(client, [])
+        for i in range(len(self.client_fruit_top[client])):
+            if self.client_fruit_top[client][i].fruit == fruit:
+                self.client_fruit_top[client][i] = self.client_fruit_top[client][i] + fruit_item.FruitItem(
                     fruit, amount
                 )
                 return
-        bisect.insort(self.fruit_top, fruit_item.FruitItem(fruit, amount))
+        bisect.insort(self.client_fruit_top[client], fruit_item.FruitItem(fruit, amount))
 
-    def _process_eof(self):
-        logging.info("Received EOF")
-        fruit_chunk = list(self.fruit_top[-TOP_SIZE:])
+    def _process_eof(self, client):
+        logging.info(f"Received EOF {client}")
+        fruit_chunk = list(self.client_fruit_top[client][-TOP_SIZE:])
         fruit_chunk.reverse()
         fruit_top = list(
             map(
@@ -46,16 +47,24 @@ class AggregationFilter:
             )
         )
         self.output_queue.send(message_protocol.internal.serialize(fruit_top))
-        del self.fruit_top
+        self.client_fruit_top.pop(client)
 
     def process_messsage(self, message, ack, nack):
         logging.info("Process message")
-        fields = message_protocol.internal.deserialize(message)
-        if len(fields) == 2:
-            self._process_data(*fields)
-        else:
-            self._process_eof()
-        ack()
+        try:
+            fields = message_protocol.internal.deserialize(message)
+            if len(fields) == 3:
+                self._process_data(*fields)
+                ack()
+            elif len(fields) == 1:
+                self._process_eof(*fields)
+                ack()
+            else:
+                logging.error(f"Error del protocolo: se recibieron {fields}")
+                nack()
+        except Exception as e:
+            logging.error(f"Error general: {e}")
+            nack()
 
     def start(self):
         self.input_exchange.start_consuming(self.process_messsage)
