@@ -28,13 +28,14 @@ class AggregationFilter:
     def _process_data(self, client, fruit, amount):
         logging.info(f"Processing data message {client} {fruit} {amount}")
         self.client_fruit_top[client] = self.client_fruit_top.get(client, [])
-        for i in range(len(self.client_fruit_top[client])):
-            if self.client_fruit_top[client][i].fruit == fruit:
-                self.client_fruit_top[client][i] = self.client_fruit_top[client][i] + fruit_item.FruitItem(
-                    fruit, amount
-                )
-                return
-        bisect.insort(self.client_fruit_top[client], fruit_item.FruitItem(fruit, amount))
+        new_fruit_value = fruit_item.FruitItem(fruit, amount)
+        i = 0 
+        while i < len(self.client_fruit_top[client]) and self.client_fruit_top[client][i].fruit != fruit:
+            i += 1 
+        if i < len(self.client_fruit_top[client]):
+            new_fruit_value += self.client_fruit_top[client].pop(i) 
+
+        bisect.insort(self.client_fruit_top[client], new_fruit_value)
 
     def _process_eof(self, client):
         logging.info(f"Received EOF {client}")
