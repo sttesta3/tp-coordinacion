@@ -22,14 +22,43 @@ class JoinFilter:
         self.output_queue = middleware.MessageMiddlewareQueueRabbitMQ(
             MOM_HOST, OUTPUT_QUEUE
         )
+        self.client_fruit_top = {}
+        self.received_tops_by_client = {}
+
+    def _merge_tops(self, top1: list[fruit_item.FruitItem], top2: list[fruit_item.FruitItem]):
+        result = []
+        i_1 = 0
+        i_2 = 0
+        while i_1 + i_2 < TOP_SIZE:
+            if top1[i_1] < top2[i_2]:
+                result.append(top2[i_2])
+                i_2 += 1
+            else:
+                result.append(top1[i_1])
+                i_1 += 1
+        return result
 
     def process_messsage(self, message, ack, nack):
         logging.info("Received top")
         try:
-            fruit_top = message_protocol.internal.deserialize(message)
-            self.output_queue.send(message_protocol.internal.serialize(fruit_top))
+            client, fruit_top_json = message_protocol.internal.deserialize(message)
+            fruit_top = [ fruit_item.FruitItem(fruit_json[0],fruit_json[1]) for fruit_json in fruit_top_json ]
+            logging.info(f"Deserialized {message_protocol.internal.deserialize(message)}")
+            if client in self.client_fruit_top:
+                self.client_fruit_top[client] = self._merge_tops(self.client_fruit_top[client], fruit_top)
+                self.received_tops_by_client[client] += 1 
+            else: 
+                self.client_fruit_top[client] = fruit_top
+                self.received_tops_by_client[client] = 1
+
+            if self.received_tops_by_client[client] == AGGREGATION_AMOUNT:
+                self.output_queue.send(message_protocol.internal.serialize([ [ fruit.fruit, fruit.amount ] for fruit in self.client_fruit_top[client] ]))
+                self.received_tops_by_client.pop(client)
+                self.client_fruit_top.pop(client)
+
             ack()
-        except:
+        except Exception as e :
+            logging.error(f"Error general: {e}")
             nack()
 
     def start(self):

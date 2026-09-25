@@ -47,7 +47,8 @@ class AggregationFilter:
                 fruit_chunk,
             )
         )
-        self.output_queue.send(message_protocol.internal.serialize(fruit_top))
+        
+        self.output_queue.send(message_protocol.internal.serialize((client, fruit_top)))
         self.client_fruit_top.pop(client)
 
     def process_messsage(self, message, ack, nack):
