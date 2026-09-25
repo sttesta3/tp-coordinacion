@@ -42,7 +42,7 @@ class SumFilter:
             # - Muchos clientes con la misma fruta: OK, al agregar al cliente el trabajo es balanceado
             # - Un unico cliente con muchas frutas: OK, al agregar la fruta es balanceado 
             # Nota: No hay fruta cuyo nombre tenga menos de tres letras 
-            aggregator = ( sum(ord(char) for char in final_fruit_item.fruit[:3]) + sum(ord(char) for char in str(client)[:3]) ) % AGGREGATION_AMOUNT
+            aggregator = ( sum(ord(char) for char in final_fruit_item.fruit) + sum(ord(char) for char in str(client)) ) % AGGREGATION_AMOUNT
             self.data_output_exchanges[aggregator].send(
                 message_protocol.internal.serialize(
                     [client, final_fruit_item.fruit, final_fruit_item.amount]
@@ -50,9 +50,9 @@ class SumFilter:
             )
 
         sums_already_red += 1  
-        if sums_already_red < SUM_AMOUNT:
+        if sums_already_red < SUM_AMOUNT:   # Quedan Instancias de Sum sin recibir este EOF
             self.input_queue.send(message_protocol.internal.serialize([client,sums_already_red]))
-        else: 
+        else:                               # Ultimo Sum. Envio EOF a los Aggregators 
             logging.info(f"Broadcasting EOF message {client}")            
             for data_output_exchange in self.data_output_exchanges:
                 data_output_exchange.send(message_protocol.internal.serialize([client]))
