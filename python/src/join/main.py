@@ -43,7 +43,6 @@ class JoinFilter:
         try:
             client, fruit_top_json = message_protocol.internal.deserialize(message)
             fruit_top = [ fruit_item.FruitItem(fruit_json[0],fruit_json[1]) for fruit_json in fruit_top_json ]
-            logging.info(f"Deserialized {message_protocol.internal.deserialize(message)}")
             if client in self.client_fruit_top:
                 self.client_fruit_top[client] = self._merge_tops(self.client_fruit_top[client], fruit_top)
                 self.received_tops_by_client[client] += 1 
