@@ -36,7 +36,7 @@ class SumFilter:
 
     def _process_eof(self, client, sums_already_red):
         logging.info(f"Sending data messages {client} \n{[ {fruit.fruit,fruit.amount} for fruit in self.amount_by_client_fruit[client].values() ]}")
-        for final_fruit_item in self.amount_by_client_fruit[client].values():
+        for final_fruit_item in self.amount_by_client_fruit.get(client,[]).values():
             # Los mensajes tienen afinidad por fruta y por cliente 
             # El objetivo es que se distribuya la carga de forma estadisticamente uniforme, cumpliendo con los siguientes escenarios
             # - Muchos clientes con la misma fruta: OK, al agregar al cliente el trabajo es balanceado
@@ -49,15 +49,15 @@ class SumFilter:
                 )
             )
 
-        sums_already_red += 1  
-        if sums_already_red < SUM_AMOUNT:   # Quedan Instancias de Sum sin recibir este EOF
+        sums_already_red.append(ID)  
+        if len(sums_already_red) < SUM_AMOUNT:   # Quedan Instancias de Sum sin recibir este EOF
             self.input_queue.send(message_protocol.internal.serialize([client,sums_already_red]))
         else:                               # Ultimo Sum. Envio EOF a los Aggregators 
             logging.info(f"Broadcasting EOF message {client}")            
             for data_output_exchange in self.data_output_exchanges:
                 data_output_exchange.send(message_protocol.internal.serialize([client]))
 
-        self.amount_by_client_fruit.pop(client)
+        self.amount_by_client_fruit.pop(client, None)
 
     def process_data_messsage(self, message, ack, nack):
         try:
@@ -66,13 +66,13 @@ class SumFilter:
                 self._process_data(*fields)
                 ack()
             elif len(fields) == 2:                              # EOF ya recibido por otros sums
-                if fields[0] in self.amount_by_client_fruit :   
+                if not ID in fields[1]:   
                     self._process_eof(*fields)
                     ack()                                      
-                else:                                           # Si el cliente no esta, ya lo envie
+                else:                                           # Ya recibi este EOF
                     nack()                                      # Devuelvo mensaje a la cola ? (requeue=True) 
             elif len(fields) == 1:                              # EOF del cliente
-                self._process_eof(*fields, 0)
+                self._process_eof(*fields, [])
                 ack()
             else:
                 logging.error(f"Error del protocolo: se recibieron {fields}")

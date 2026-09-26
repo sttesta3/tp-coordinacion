@@ -1,3 +1,4 @@
 copy_tpmom.sh
 *__pycache__*
 python/output/
+python/docker-compose.yaml
