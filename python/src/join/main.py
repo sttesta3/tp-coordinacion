@@ -1,5 +1,6 @@
 import os
 import logging
+import signal 
 
 from common import middleware, message_protocol, fruit_item
 
@@ -63,10 +64,27 @@ class JoinFilter:
     def start(self):
         self.input_queue.start_consuming(self.process_messsage)
 
+    def stop(self):
+        try:
+            self.input_queue.stop_consuming()
+            self.input_queue.close()
+            self.output_queue.close()
+        except Exception as e:
+            logging.warning(f"Error durante manejo de sigterm: {e}")
 
 def main():
     logging.basicConfig(level=logging.INFO)
     join_filter = JoinFilter()
+
+    def handle_sigterm(signum, frame):
+        logging.info(f"Señal recibida {signum}. Deteniendo..")
+        return join_filter.stop()
+
+    signal.signal(
+        signal.SIGTERM,
+        lambda signum, frame: handle_sigterm(),
+    )
+
     join_filter.start()
 
     return 0

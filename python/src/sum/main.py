@@ -1,6 +1,6 @@
 import os
 import logging
-import threading
+import signal 
 
 from common import middleware, message_protocol, fruit_item
 
@@ -85,9 +85,30 @@ class SumFilter:
     def start(self):
         self.input_queue.start_consuming(self.process_data_messsage)
 
+    def stop(self):
+        try:
+            self.input_queue.stop_consuming()
+            self.input_queue.close()
+            for exchange in self.data_output_exchanges:
+                exchange.close()
+            return 0
+        except Exception as e:
+            logging.warning(f"Error durante manejo de sigterm: {e}")
+            return 1
+
 def main():
     logging.basicConfig(level=logging.INFO)
     sum_filter = SumFilter()
+    
+    def handle_sigterm(signum, frame):
+        logging.info(f"Señal recibida {signum}. Deteniendo..")
+        return sum_filter.stop()
+
+    signal.signal(
+        signal.SIGTERM,
+        lambda signum, frame: handle_sigterm(),
+    )
+
     sum_filter.start()
     return 0
 
