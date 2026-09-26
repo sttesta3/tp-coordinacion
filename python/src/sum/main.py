@@ -80,7 +80,6 @@ class SumFilter:
         except Exception as e:
             logging.error(f"Error general: {e}")
             nack()
-            raise e
         
     def start(self):
         self.input_queue.start_consuming(self.process_data_messsage)
