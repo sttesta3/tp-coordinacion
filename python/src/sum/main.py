@@ -36,7 +36,7 @@ class SumFilter:
 
     def _process_eof(self, client, sums_already_red):
         logging.info(f"Sending data messages {client} \n{[ {fruit.fruit,fruit.amount} for fruit in self.amount_by_client_fruit[client].values() ]}")
-        for final_fruit_item in self.amount_by_client_fruit[client].values():
+        for final_fruit_item in self.amount_by_client_fruit.get(client,[]).values():
             # Los mensajes tienen afinidad por fruta y por cliente 
             # El objetivo es que se distribuya la carga de forma estadisticamente uniforme, cumpliendo con los siguientes escenarios
             # - Muchos clientes con la misma fruta: OK, al agregar al cliente el trabajo es balanceado
@@ -57,7 +57,7 @@ class SumFilter:
             for data_output_exchange in self.data_output_exchanges:
                 data_output_exchange.send(message_protocol.internal.serialize([client]))
 
-        self.amount_by_client_fruit.pop(client)
+        self.amount_by_client_fruit.pop(client, None)
 
     def process_data_messsage(self, message, ack, nack):
         try:
