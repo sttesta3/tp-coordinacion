@@ -73,9 +73,11 @@ class JoinFilter:
             self.input_queue.stop_consuming()
             self.input_queue.close()
             self.output_queue.close()
+            return 0
         except Exception as e:
-            logging.warning(f"Error durante manejo de sigterm: {e}")
-
+            logging.warning(f"Error durante detención del servidor: {e}")
+            return 1 
+        
     def _state_dependent_log(self, exception: Exception):
         if self.normal_operation:
             logging.error(f"Error general durante operacion normal: {exception}")

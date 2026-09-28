@@ -81,8 +81,10 @@ class AggregationFilter:
             self.input_exchange.stop_consuming()
             self.input_exchange.close()
             self.output_queue.close()
+            return 0
         except Exception as e:
-            self._state_dependent_log(e)
+            logging.warning(f"Error durante detención del servidor: {e}")
+            return 1
 
     def _state_dependent_log(self, exception: Exception):
         if self.normal_operation:
