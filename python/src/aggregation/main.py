@@ -14,7 +14,6 @@ AGGREGATION_AMOUNT = int(os.environ["AGGREGATION_AMOUNT"])
 AGGREGATION_PREFIX = os.environ["AGGREGATION_PREFIX"]
 TOP_SIZE = int(os.environ["TOP_SIZE"])
 
-
 class AggregationFilter:
 
     def __init__(self):
@@ -25,6 +24,7 @@ class AggregationFilter:
             MOM_HOST, OUTPUT_QUEUE
         )
         self.client_fruit_top = {}  
+        self.normal_operation = True
 
     def _process_data(self, client, fruit, amount):
         logging.info(f"Processing data message {client} {fruit} {amount}")
@@ -66,19 +66,30 @@ class AggregationFilter:
                 logging.error(f"Error del protocolo: se recibieron {fields}")
                 nack()
         except Exception as e:
-            logging.error(f"Error general: {e}")
             nack()
+            self._state_dependent_log(e)
 
     def start(self):
-        self.input_exchange.start_consuming(self.process_messsage)
+        try:
+            self.input_exchange.start_consuming(self.process_messsage)
+        except Exception as e:
+            self._state_dependent_log(e)
 
     def stop(self):
+        self.normal_operation=False
         try:
             self.input_exchange.stop_consuming()
             self.input_exchange.close()
             self.output_queue.close()
         except Exception as e:
-            logging.warning(f"Error durante manejo de sigterm: {e}")
+            self._state_dependent_log(e)
+
+    def _state_dependent_log(self, exception: Exception):
+        if self.normal_operation:
+            logging.error(f"Error general durante operacion normal: {exception}")
+            raise exception 
+        else:
+            logging.warning(f"Error general durante operacion anormal: {exception}")
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -90,7 +101,7 @@ def main():
 
     signal.signal(
         signal.SIGTERM,
-        lambda signum, frame: handle_sigterm(),
+        lambda signum, frame: handle_sigterm(signum,frame),
     )
 
     aggregation_filter.start()
