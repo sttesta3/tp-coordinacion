@@ -1,5 +1,6 @@
 import os
 import logging
+import signal 
 
 from common import middleware, message_protocol, fruit_item
 
@@ -12,7 +13,6 @@ AGGREGATION_AMOUNT = int(os.environ["AGGREGATION_AMOUNT"])
 AGGREGATION_PREFIX = os.environ["AGGREGATION_PREFIX"]
 TOP_SIZE = int(os.environ["TOP_SIZE"])
 
-
 class JoinFilter:
 
     def __init__(self):
@@ -24,6 +24,7 @@ class JoinFilter:
         )
         self.client_fruit_top = {}
         self.received_tops_by_client = {}
+        self.normal_operation = True
 
     def _merge_tops(self, top1: list[fruit_item.FruitItem], top2: list[fruit_item.FruitItem]):
         result = []
@@ -57,16 +58,46 @@ class JoinFilter:
 
             ack()
         except Exception as e :
-            logging.error(f"Error general: {e}")
             nack()
-
+            self._state_dependent_log(e)
+            
     def start(self):
-        self.input_queue.start_consuming(self.process_messsage)
+        try:
+            self.input_queue.start_consuming(self.process_messsage)
+        except Exception as e:
+            self._state_dependent_log(e)
 
+    def stop(self):
+        self.normal_operation=False
+        try:
+            self.input_queue.stop_consuming()
+            self.input_queue.close()
+            self.output_queue.close()
+            return 0
+        except Exception as e:
+            logging.warning(f"Error durante detención del servidor: {e}")
+            return 1 
+        
+    def _state_dependent_log(self, exception: Exception):
+        if self.normal_operation:
+            logging.error(f"Error general durante operacion normal: {exception}")
+            raise exception 
+        else:
+            logging.warning(f"Error general durante operacion anormal: {exception}")
 
 def main():
     logging.basicConfig(level=logging.INFO)
     join_filter = JoinFilter()
+
+    def handle_sigterm(signum, frame):
+        logging.info(f"Señal recibida {signum}. Deteniendo..")
+        return join_filter.stop()
+
+    signal.signal(
+        signal.SIGTERM,
+        lambda signum, frame: handle_sigterm(signum,frame),
+    )
+
     join_filter.start()
 
     return 0

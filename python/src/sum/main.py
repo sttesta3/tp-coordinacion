@@ -1,6 +1,6 @@
 import os
 import logging
-import threading
+import signal 
 
 from common import middleware, message_protocol, fruit_item
 
@@ -26,6 +26,7 @@ class SumFilter:
             self.data_output_exchanges.append(data_output_exchange)
 
         self.amount_by_client_fruit = {}
+        self.normal_operation = True
 
     def _process_data(self, client, fruit, amount):
 #        logging.info(f"Process data {client} {fruit} {amount}")
@@ -78,16 +79,47 @@ class SumFilter:
                 logging.error(f"Error del protocolo: se recibieron {fields}")
                 nack()
         except Exception as e:
-            logging.error(f"Error general: {e}")
             nack()
-            raise e
+            self._state_dependent_log(e)
         
     def start(self):
-        self.input_queue.start_consuming(self.process_data_messsage)
+        try:
+            self.input_queue.start_consuming(self.process_data_messsage)
+        except Exception as e:
+            self._state_dependent_log(e)
+
+    def stop(self):
+        self.normal_operation = False
+        try:
+            self.input_queue.stop_consuming()
+            self.input_queue.close()
+            for exchange in self.data_output_exchanges:
+                exchange.close()
+            return 0
+        except Exception as e:
+            logging.warning(f"Error durante detención del servidor: {e}")
+            return 1
+
+    def _state_dependent_log(self, exception: Exception):
+        if self.normal_operation:
+            logging.error(f"Error general durante operacion normal: {exception}")
+            raise exception 
+        else:
+            logging.warning(f"Error general durante operacion anormal: {exception}")
 
 def main():
     logging.basicConfig(level=logging.INFO)
     sum_filter = SumFilter()
+    
+    def handle_sigterm(signum, frame):
+        logging.info(f"Señal recibida {signum}. Deteniendo..")
+        return sum_filter.stop()
+
+    signal.signal(
+        signal.SIGTERM,
+        lambda signum, frame: handle_sigterm(signum,frame),
+    )
+
     sum_filter.start()
     return 0
 
