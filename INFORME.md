@@ -45,6 +45,16 @@ Se tomo esta decisión con el objetivo de distribuir la carga entre los distinto
 
 Al recibir el eof, envian su top al join y limpian la metadata del cliente.
 
+# Escalabilidad del sistema 
+
+## Escalabilidad de clientes y datos 
+
+El sistema no limita la escalabilidad de clientes o datos, dado el bajo acoplamiento entre instancias de Sums y Aggregators, habilitando la escalabilidad horizontal (únicamente limitado por el siguiente punto).
+
+## Escalabilidad de controles 
+
+La principal limitación de escalabilidad es la cantidad de mensajes de eof y nacks, cuyo promedio crece como O(n.log(n)) con n la cantidad de instancias de sums del sistema. 
+
 # Lenguaje Elegido
 
 Python
