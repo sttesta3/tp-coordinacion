@@ -27,18 +27,10 @@ class JoinFilter:
         self.normal_operation = True
 
     def _merge_tops(self, top1: list[fruit_item.FruitItem], top2: list[fruit_item.FruitItem]):
-        result = []
-        i_1 = 0
-        i_2 = 0
-        while i_1 + i_2 < TOP_SIZE:
-            if top1[i_1] < top2[i_2]:
-                result.append(top2[i_2])
-                i_2 += 1
-            else:
-                result.append(top1[i_1])
-                i_1 += 1
-        return result
-
+        result = top1 + top2
+        result.sort(reverse=True)
+        return result[:TOP_SIZE]
+        
     def process_messsage(self, message, ack, nack):
         logging.info("Received top")
         try:

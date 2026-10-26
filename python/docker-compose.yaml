@@ -96,7 +96,7 @@ services:
     - sum_1
     - sum_2
     environment:
-    - INPUT_FILE=/datasets/input_2.csv
+    - INPUT_FILE=/datasets/short.csv
     - OUTPUT_FILE=/output/output_2.csv
     - PYTHONUNBUFFERED=1
     - SERVER_HOST=gateway
