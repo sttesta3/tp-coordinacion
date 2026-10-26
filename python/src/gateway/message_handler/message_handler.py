@@ -14,5 +14,8 @@ class MessageHandler:
         return message_protocol.internal.serialize([self.client])
 
     def deserialize_result_message(self, message):
-        fields = message_protocol.internal.deserialize(message)
+        client, fields = message_protocol.internal.deserialize(message)
+        # Gateway chequea cliente por cliente, si no lo encontro devuelve vacio para revisar proximo cliente
+        if client != self.client:
+            return []
         return fields

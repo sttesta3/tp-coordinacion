@@ -52,7 +52,7 @@ class JoinFilter:
                 self.received_tops_by_client[client] = 1
 
             if self.received_tops_by_client[client] == AGGREGATION_AMOUNT:
-                self.output_queue.send(message_protocol.internal.serialize([ [ fruit.fruit, fruit.amount ] for fruit in self.client_fruit_top[client] ]))
+                self.output_queue.send(message_protocol.internal.serialize([client, [ [ fruit.fruit, fruit.amount ] for fruit in self.client_fruit_top[client] ]]))
                 self.received_tops_by_client.pop(client)
                 self.client_fruit_top.pop(client)
 
