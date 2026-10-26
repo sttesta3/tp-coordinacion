@@ -13,6 +13,23 @@ AGGREGATION_AMOUNT = int(os.environ["AGGREGATION_AMOUNT"])
 AGGREGATION_PREFIX = os.environ["AGGREGATION_PREFIX"]
 TOP_SIZE = int(os.environ["TOP_SIZE"])
 
+class JoinTop:
+    def __init__(self):
+        self.top = []
+        self.count = 0
+
+    def merge(self,top):
+        final_top = self.top + top
+        final_top.sort(reverse=True)
+        self.top = final_top[:TOP_SIZE]
+        self.count += 1
+
+    def result(self):
+        return [ [ fruit.fruit, fruit.amount ] for fruit in self.top ]
+
+    def reach_aggregation_amount(self):
+        return self.count >= AGGREGATION_AMOUNT
+
 class JoinFilter:
 
     def __init__(self):
@@ -22,30 +39,19 @@ class JoinFilter:
         self.output_queue = middleware.MessageMiddlewareQueueRabbitMQ(
             MOM_HOST, OUTPUT_QUEUE
         )
-        self.client_fruit_top = {}
-        self.received_tops_by_client = {}
+        self.client_fruit_top: dict[JoinTop] = {}
         self.normal_operation = True
-
-    def _merge_tops(self, top1: list[fruit_item.FruitItem], top2: list[fruit_item.FruitItem]):
-        result = top1 + top2
-        result.sort(reverse=True)
-        return result[:TOP_SIZE]
         
     def process_messsage(self, message, ack, nack):
         logging.info("Received top")
         try:
             client, fruit_top_json = message_protocol.internal.deserialize(message)
             fruit_top = [ fruit_item.FruitItem(fruit_json[0],fruit_json[1]) for fruit_json in fruit_top_json ]
-            if client in self.client_fruit_top:
-                self.client_fruit_top[client] = self._merge_tops(self.client_fruit_top[client], fruit_top)
-                self.received_tops_by_client[client] += 1 
-            else: 
-                self.client_fruit_top[client] = fruit_top
-                self.received_tops_by_client[client] = 1
+            self.client_fruit_top[client] = self.client_fruit_top.get(client,JoinTop())
+            self.client_fruit_top[client].merge(fruit_top)
 
-            if self.received_tops_by_client[client] == AGGREGATION_AMOUNT:
-                self.output_queue.send(message_protocol.internal.serialize([client, [ [ fruit.fruit, fruit.amount ] for fruit in self.client_fruit_top[client] ]]))
-                self.received_tops_by_client.pop(client)
+            if self.client_fruit_top[client].reach_aggregation_amount():
+                self.output_queue.send(message_protocol.internal.serialize([client, self.client_fruit_top[client].result()]))
                 self.client_fruit_top.pop(client)
 
             ack()
