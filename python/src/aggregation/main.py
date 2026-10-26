@@ -27,6 +27,8 @@ class AggregationFilter:
         self.normal_operation = True
 
     def _process_data(self, client, fruit, amount):
+        '''
+        OLD CODE
         logging.info(f"Processing data message {client} {fruit} {amount}")
         self.client_fruit_top[client] = self.client_fruit_top.get(client, [])
         new_fruit_value = fruit_item.FruitItem(fruit, amount)
@@ -38,19 +40,24 @@ class AggregationFilter:
 
         bisect.insort(self.client_fruit_top[client], new_fruit_value)
 
+        NEW CODE (uncommented)
+        '''
+        self.client_fruit_top[client] = self.client_fruit_top.get(client, {})
+        self.client_fruit_top[client][fruit] = self.client_fruit_top[client].get(fruit,0)
+        self.client_fruit_top[client][fruit] += amount
+
     def _process_eof(self, client):
         logging.info(f"Received EOF {client}")
-        fruit_chunk = list(self.client_fruit_top[client][-TOP_SIZE:])
-        fruit_chunk.reverse()
-        fruit_top = list(
-            map(
-                lambda fruit_item: (fruit_item.fruit, fruit_item.amount),
-                fruit_chunk,
-            )
-        )
+
+        fruits_by_name = self.client_fruit_top.get(client, {})
+        fruit_top = sorted(
+            fruits_by_name.items(),
+            key=lambda fruit_amount: fruit_amount[1],
+            reverse=True,
+        )[:TOP_SIZE]
         
         self.output_queue.send(message_protocol.internal.serialize((client, fruit_top)))
-        self.client_fruit_top.pop(client)
+        self.client_fruit_top.pop(client, None)
 
     def process_messsage(self, message, ack, nack):
         logging.info("Process message")
